@@ -11,13 +11,14 @@ export default class Player
         this.mapX = 15;
         this.mapY = 11;
         this.username = 'Whinger';
+        this.speed = 400;
     }
 
     create()
     {
         // render
-        var left = this.play.world.mapWidth * this.worldX + this.mapX * this.play.world.tileWidth + this.play.world.tileWidth / 2;
-        var top = this.play.world.mapHeight * this.worldY + this.mapY * this.play.world.tileHeight + this.play.world.tileHeight / 2;
+        var left = window.config.mapWidth * this.worldX + this.mapX * window.config.tileWidth + window.config.tileWidth / 2;
+        var top = window.config.mapHeight * this.worldY + this.mapY * window.config.tileHeight + window.config.tileHeight / 2;
 
         this.sprite = this.game.add.sprite(left, top, 'player');
 
@@ -52,17 +53,17 @@ export default class Player
         this.sprite.body.angularVelocity = 0;
 
         if (this.wasd.left.isDown) {
-            this.sprite.body.velocity.x = -200;
+            this.sprite.body.velocity.x = -1 * this.speed;
         }
         else if (this.wasd.right.isDown) {
-            this.sprite.body.velocity.x = 200;
+            this.sprite.body.velocity.x = this.speed;
         }
 
         if (this.wasd.up.isDown) {
-           this.sprite.body.velocity.y = -200;
+           this.sprite.body.velocity.y = -1 * this.speed;
         }
         else if (this.wasd.down.isDown) {
-           this.sprite.body.velocity.y = 200;
+           this.sprite.body.velocity.y = this.speed;
         }
     }
 
@@ -74,13 +75,25 @@ export default class Player
 
     updateMapLocation()
     {
-        this.mapX = Math.floor((this.sprite.x % this.play.world.mapWidth) / this.play.world.tileWidth);
-        this.mapY = Math.floor((this.sprite.y % this.play.world.mapHeight) / this.play.world.tileHeight);
+        const x = this.sprite.x;
+        const y = this.sprite.y;
+
+        if(x > 0) {
+            this.mapX = Math.floor((x % window.config.mapWidth) / window.config.tileWidth);
+        } else {
+            this.mapX = window.config.mapTilesWidth - Math.ceil((Math.abs(x) % window.config.mapWidth) / window.config.tileWidth);
+        }
+
+        if(y > 0) {
+            this.mapY = Math.floor((y % window.config.mapHeight) / window.config.tileHeight);
+        } else {
+            this.mapY = window.config.mapTilesHeight - Math.ceil((Math.abs(y) % window.config.mapHeight) / window.config.tileHeight);
+        }
     }
 
     updateWorldLocation()
     {
-        this.worldX = Math.floor(this.sprite.x / this.play.world.mapWidth);
-        this.worldY = Math.floor(this.sprite.y / this.play.world.mapHeight);
+        this.worldX = Math.floor(this.sprite.x / window.config.mapWidth);
+        this.worldY = Math.floor(this.sprite.y / window.config.mapHeight);
     }
 }

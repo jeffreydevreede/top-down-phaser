@@ -10,11 +10,6 @@ export default class World
         this.maps = {};
         this.loadedMaps = {};
 
-        this.tileWidth = 64;
-        this.tileHeight = 64;
-        this.mapWidth = 32*64;
-        this.mapHeight = 24*64;
-
         this.top = null;
         this.right = null;
         this.bottom = null;
@@ -29,37 +24,81 @@ export default class World
     create()
     {
         this.setMapLoadingBoundries();
+
+        this.debugText = this.game.add.text(20, 20, "", {
+            font: '20px Arial',
+            fill: '#ffffff',
+            align: 'center',
+            stroke: '#000000',
+            strokeThickness: 4
+        });
+        /*
+        this.debugText.fixedToCamera = true;
+        this.debugText.cameraOffset.setTo(100, 100);
+        */
     }
 
     update()
     {
-        var loadMap = this.shouldLoadMap();
+        var maps = this.shouldLoadMap();
+
+        // this.debugText.setText(this.play.player.mapY + ' ' + this.play.player.mapX);
 
         // is the player close enough to the next map that we should load it?
-        if(loadMap) {
+        if(maps.length > 0) {
+            var world = this;
+
             // we take the players current position
-            var x = this.play.player.worldX;
-            var y = this.play.player.worldY;
+            const playerX = this.play.player.worldX;
+            const playerY = this.play.player.worldY;
 
-            // we calculate the world x and y for the new map
-            switch(loadMap)
-            {
-                case 'top':
-                    y = this.play.player.worldY - 1;
-                    break;
-                case 'right':
-                    x = this.play.player.worldX + 1;
-                    break;
-                case 'bottom':
-                    y = this.play.player.worldY + 1;
-                    break;
-                case 'left':
-                    x = this.play.player.worldX - 1;
-                    break;
+            // loop the possible sides
+            maps.forEach(function (side) {
+                // setup initial position
+                let x = playerX;
+                let y = playerY;
+                switch(side) {
+                    case 'top':
+                        y = playerY - 1;
+                        break;
+                    case 'right':
+                        x = playerX + 1;
+                        break;
+                    case 'bottom':
+                        y = playerY + 1;
+                        break;
+                    case 'left':
+                        x = playerX - 1;
+                        break;
+                }
+                // do the actual loading
+                world.loadMap(x, y);
+            });
+
+            // are we in a corner? if so we should load the map attached to the corner
+            if(maps.length == 2) {
+                // setup initial position
+                let x = playerX;
+                let y = playerY;
+                maps.forEach(function (side) {
+                    switch(side) {
+                        case 'top':
+                            y = playerY - 1;
+                            break;
+                        case 'right':
+                            x = playerX + 1;
+                            break;
+                        case 'bottom':
+                            y = playerY + 1;
+                            break;
+                        case 'left':
+                            x = playerX - 1;
+                            break;
+                    }
+                });
+                // load the corner map
+                world.loadMap(x, y);
             }
-
-            // do the actual loading
-            this.loadMap(x, y);
         }
 
         this.game.physics.arcade.collide(this.play.player.sprite, this.collidables);
@@ -67,33 +106,34 @@ export default class World
 
     setMapLoadingBoundries()
     {
-        this.topLoadingBoundry = Math.floor((this.mapHeight / this.tileHeight) * 0.4);
-        this.rightLoadingBoundry = Math.ceil((this.mapWidth / this.tileWidth) * 0.6);
-        this.bottomLoadingBoundry = Math.floor((this.mapHeight / this.tileHeight) * 0.6);
-        this.leftLoadingBoundry = Math.ceil((this.mapWidth / this.tileWidth) * 0.4);
+        this.topLoadingBoundry = Math.floor(window.config.mapTilesHeight * 0.4);
+        this.rightLoadingBoundry = Math.ceil(window.config.mapTilesWidth * 0.6);
+        this.bottomLoadingBoundry = Math.floor(window.config.mapTilesHeight * 0.6);
+        this.leftLoadingBoundry = Math.ceil(window.config.mapTilesWidth * 0.4);
     }
 
     shouldLoadMap()
     {
+        const result = [];
         // top
         if(this.play.player.mapY < this.topLoadingBoundry) {
-            return 'top';
+            result.push('top');
         }
         // right
         if(this.play.player.mapX > this.rightLoadingBoundry) {
-            return 'right';
+            result.push('right');
         }
         // bottom
         if(this.play.player.mapY > this.bottomLoadingBoundry) {
-            return 'bottom';
+            result.push('bottom');
         }
 
         // left
         if(this.play.player.mapX < this.leftLoadingBoundry) {
-            return 'left';
+            result.push('left');
         }
 
-        return false;
+        return result;
     }
 
     loadMap(x, y)

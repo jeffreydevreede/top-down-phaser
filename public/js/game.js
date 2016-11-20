@@ -138,13 +138,14 @@ var Player = function Player(game, play)
     this.mapX = 15;
     this.mapY = 11;
     this.username = 'Whinger';
+    this.speed = 400;
 };
 
 Player.prototype.create = function create ()
 {
     // render
-    var left = this.play.world.mapWidth * this.worldX + this.mapX * this.play.world.tileWidth + this.play.world.tileWidth / 2;
-    var top = this.play.world.mapHeight * this.worldY + this.mapY * this.play.world.tileHeight + this.play.world.tileHeight / 2;
+    var left = window.config.mapWidth * this.worldX + this.mapX * window.config.tileWidth + window.config.tileWidth / 2;
+    var top = window.config.mapHeight * this.worldY + this.mapY * window.config.tileHeight + window.config.tileHeight / 2;
 
     this.sprite = this.game.add.sprite(left, top, 'player');
 
@@ -179,17 +180,17 @@ Player.prototype.updateMovement = function updateMovement ()
     this.sprite.body.angularVelocity = 0;
 
     if (this.wasd.left.isDown) {
-        this.sprite.body.velocity.x = -200;
+        this.sprite.body.velocity.x = -1 * this.speed;
     }
     else if (this.wasd.right.isDown) {
-        this.sprite.body.velocity.x = 200;
+        this.sprite.body.velocity.x = this.speed;
     }
 
     if (this.wasd.up.isDown) {
-       this.sprite.body.velocity.y = -200;
+       this.sprite.body.velocity.y = -1 * this.speed;
     }
     else if (this.wasd.down.isDown) {
-       this.sprite.body.velocity.y = 200;
+       this.sprite.body.velocity.y = this.speed;
     }
 };
 
@@ -201,14 +202,26 @@ Player.prototype.updateRotation = function updateRotation ()
 
 Player.prototype.updateMapLocation = function updateMapLocation ()
 {
-    this.mapX = Math.floor((this.sprite.x % this.play.world.mapWidth) / this.play.world.tileWidth);
-    this.mapY = Math.floor((this.sprite.y % this.play.world.mapHeight) / this.play.world.tileHeight);
+    var x = this.sprite.x;
+    var y = this.sprite.y;
+
+    if(x > 0) {
+        this.mapX = Math.floor((x % window.config.mapWidth) / window.config.tileWidth);
+    } else {
+        this.mapX = window.config.mapTilesWidth - Math.ceil((Math.abs(x) % window.config.mapWidth) / window.config.tileWidth);
+    }
+
+    if(y > 0) {
+        this.mapY = Math.floor((y % window.config.mapHeight) / window.config.tileHeight);
+    } else {
+        this.mapY = window.config.mapTilesHeight - Math.ceil((Math.abs(y) % window.config.mapHeight) / window.config.tileHeight);
+    }
 };
 
 Player.prototype.updateWorldLocation = function updateWorldLocation ()
 {
-    this.worldX = Math.floor(this.sprite.x / this.play.world.mapWidth);
-    this.worldY = Math.floor(this.sprite.y / this.play.world.mapHeight);
+    this.worldX = Math.floor(this.sprite.x / window.config.mapWidth);
+    this.worldY = Math.floor(this.sprite.y / window.config.mapHeight);
 };
 
 var Map = function Map(worldX, worldY, world, json)
@@ -219,10 +232,10 @@ var Map = function Map(worldX, worldY, world, json)
     this.json = json;
 
     // update the maps position in pixels.
-    this.top = this.worldY * this.world.mapHeight;
-    this.right = this.worldX * this.world.mapWidth + this.world.mapWidth;
-    this.bottom = this.worldY * this.world.mapHeight + this.world.mapHeight;
-    this.left = this.worldX * this.world.mapWidth;
+    this.top = this.worldY * window.config.mapHeight;
+    this.right = this.worldX * window.config.mapWidth + window.config.mapWidth;
+    this.bottom = this.worldY * window.config.mapHeight + window.config.mapHeight;
+    this.left = this.worldX * window.config.mapWidth;
 };
 
 /**
@@ -243,15 +256,12 @@ Map.prototype.render = function render (game)
     var mapLeft = this.left;
     var mapTop = this.top;
 
-    var tileWidth = this.world.tileWidth;
-    var tileHeight = this.world.tileHeight;
-
     var collisionMap = this.json.collision;
     this.json.sprite.forEach(function (row, y) {
         row.forEach(function (frame, x) {
             // calculate left and top position in pixels for this tile.
-            var left = mapLeft + (x * tileWidth);
-            var top = mapTop + (y * tileHeight);
+            var left = mapLeft + (x * window.config.tileWidth);
+            var top = mapTop + (y * window.config.tileHeight);
 
             // create the map background tiles based on the tiled sprite.
             var sprite = game.add.sprite(left, top, 'tiles', frame);
@@ -283,11 +293,6 @@ var World = function World(game, play)
     this.maps = {};
     this.loadedMaps = {};
 
-    this.tileWidth = 64;
-    this.tileHeight = 64;
-    this.mapWidth = 32*64;
-    this.mapHeight = 24*64;
-
     this.top = null;
     this.right = null;
     this.bottom = null;
@@ -302,37 +307,81 @@ var World = function World(game, play)
 World.prototype.create = function create ()
 {
     this.setMapLoadingBoundries();
+
+    this.debugText = this.game.add.text(20, 20, "", {
+        font: '20px Arial',
+        fill: '#ffffff',
+        align: 'center',
+        stroke: '#000000',
+        strokeThickness: 4
+    });
+    /*
+    this.debugText.fixedToCamera = true;
+    this.debugText.cameraOffset.setTo(100, 100);
+    */
 };
 
 World.prototype.update = function update ()
 {
-    var loadMap = this.shouldLoadMap();
+    var maps = this.shouldLoadMap();
+
+    // this.debugText.setText(this.play.player.mapY + ' ' + this.play.player.mapX);
 
     // is the player close enough to the next map that we should load it?
-    if(loadMap) {
+    if(maps.length > 0) {
+        var world = this;
+
         // we take the players current position
-        var x = this.play.player.worldX;
-        var y = this.play.player.worldY;
+        var playerX = this.play.player.worldX;
+        var playerY = this.play.player.worldY;
 
-        // we calculate the world x and y for the new map
-        switch(loadMap)
-        {
-            case 'top':
-                y = this.play.player.worldY - 1;
-                break;
-            case 'right':
-                x = this.play.player.worldX + 1;
-                break;
-            case 'bottom':
-                y = this.play.player.worldY + 1;
-                break;
-            case 'left':
-                x = this.play.player.worldX - 1;
-                break;
+        // loop the possible sides
+        maps.forEach(function (side) {
+            // setup initial position
+            var x = playerX;
+            var y = playerY;
+            switch(side) {
+                case 'top':
+                    y = playerY - 1;
+                    break;
+                case 'right':
+                    x = playerX + 1;
+                    break;
+                case 'bottom':
+                    y = playerY + 1;
+                    break;
+                case 'left':
+                    x = playerX - 1;
+                    break;
+            }
+            // do the actual loading
+            world.loadMap(x, y);
+        });
+
+        // are we in a corner? if so we should load the map attached to the corner
+        if(maps.length == 2) {
+            // setup initial position
+            var x = playerX;
+            var y = playerY;
+            maps.forEach(function (side) {
+                switch(side) {
+                    case 'top':
+                        y = playerY - 1;
+                        break;
+                    case 'right':
+                        x = playerX + 1;
+                        break;
+                    case 'bottom':
+                        y = playerY + 1;
+                        break;
+                    case 'left':
+                        x = playerX - 1;
+                        break;
+                }
+            });
+            // load the corner map
+            world.loadMap(x, y);
         }
-
-        // do the actual loading
-        this.loadMap(x, y);
     }
 
     this.game.physics.arcade.collide(this.play.player.sprite, this.collidables);
@@ -340,33 +389,34 @@ World.prototype.update = function update ()
 
 World.prototype.setMapLoadingBoundries = function setMapLoadingBoundries ()
 {
-    this.topLoadingBoundry = Math.floor((this.mapHeight / this.tileHeight) * 0.4);
-    this.rightLoadingBoundry = Math.ceil((this.mapWidth / this.tileWidth) * 0.6);
-    this.bottomLoadingBoundry = Math.floor((this.mapHeight / this.tileHeight) * 0.6);
-    this.leftLoadingBoundry = Math.ceil((this.mapWidth / this.tileWidth) * 0.4);
+    this.topLoadingBoundry = Math.floor(window.config.mapTilesHeight * 0.4);
+    this.rightLoadingBoundry = Math.ceil(window.config.mapTilesWidth * 0.6);
+    this.bottomLoadingBoundry = Math.floor(window.config.mapTilesHeight * 0.6);
+    this.leftLoadingBoundry = Math.ceil(window.config.mapTilesWidth * 0.4);
 };
 
 World.prototype.shouldLoadMap = function shouldLoadMap ()
 {
+    var result = [];
     // top
     if(this.play.player.mapY < this.topLoadingBoundry) {
-        return 'top';
+        result.push('top');
     }
     // right
     if(this.play.player.mapX > this.rightLoadingBoundry) {
-        return 'right';
+        result.push('right');
     }
     // bottom
     if(this.play.player.mapY > this.bottomLoadingBoundry) {
-        return 'bottom';
+        result.push('bottom');
     }
 
     // left
     if(this.play.player.mapX < this.leftLoadingBoundry) {
-        return 'left';
+        result.push('left');
     }
 
-    return false;
+    return result;
 };
 
 World.prototype.loadMap = function loadMap (x, y)
@@ -519,6 +569,15 @@ var PlayState = (function (State$$1) {
 
     return PlayState;
 }(State));
+
+window.config = {
+    'tileWidth': 64, // pixels
+    'tileHeight': 64, // pixels
+    'mapTilesWidth': 32, // tiles
+    'mapTilesHeight': 24, // tiles
+    'mapWidth': 32 * 64, // tiles * pixels
+    'mapHeight': 24 * 64, // tiles * pixels
+};
 
 var game = new Phaser.Game(1440, 900, Phaser.AUTO, '');
 
